@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="fa" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Proxy Explorer</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+      body { background: #0b1220; color: #fff; font-family: Inter, sans-serif; }
+      img.flag { width: 20px; height: 14px; border-radius: 2px; object-fit: cover; }
+      #toast {
+        position: fixed; left:50%; transform: translateX(-50%);
+        bottom: 36px; background: rgba(0,0,0,0.6);
+        color: #fff; padding:10px 14px; border-radius:10px;
+        backdrop-filter: blur(6px); z-index:60; display:none; font-size:14px;
+      }
+      .dropdown { position: relative; display: inline-block; }
+      .dropdown-content {
+        display: none; position: absolute; background-color: #1a1f2e;
+        min-width: 160px; max-height: 250px; overflow-y:auto; z-index:50;
+        border-radius:8px; box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      }
+      .dropdown:hover .dropdown-content { display: block; }
+      .dropdown-item { display:flex; align-items:center; gap:6px; padding:6px 10px; cursor:pointer; border-radius:5px; }
+      .dropdown-item:hover { background: #2a2f3e; }
+      .glass-card {
+        background: rgba(255,255,255,0.05);
+        backdrop-filter: blur(10px);
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+      .glass-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <div id="toast"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect, useMemo, useRef } = React;
+
+      const COUNTRY_NAMES = {
+        ir: "ایران", us: "آمریکا", de: "آلمان", fr: "فرانسه",
+        ru: "روسیه", tr: "ترکیه", gb: "انگلیس", nl: "هلند",
+        cn: "چین", in: "هند", jp: "ژاپن", ca: "کانادا",
+        br: "برزیل", ae: "امارات", "--": "نامشخص"
+      };
+
+      function useFetchLists(mtUrl, socksUrl) {
+        const [data, setData] = useState([]);
+        const [loading, setLoading] = useState(true);
+        const [error, setError] = useState(null);
+
+        useEffect(() => {
+          async function fetchAll() {
+            try {
+              const [mtRes, socksRes] = await Promise.all([fetch(mtUrl), fetch(socksUrl)]);
+              const mtJson = await mtRes.json();
+              const socksJson = await socksRes.json();
+              const arr = [];
+              (Array.isArray(mtJson) ? mtJson : Object.values(mtJson)).forEach(it =>
+                arr.push({id:"mt-"+(it.host||Math.random()), protocol:"MTProto", host:it.host, port:it.port, secret:it.secret, country:(it.country||"--").toLowerCase(), ping:it.ping})
+              );
+              (Array.isArray(socksJson) ? socksJson : Object.values(socksJson)).forEach(it =>
+                arr.push({id:"socks-"+(it.ip||Math.random()), protocol:"SOCKS5", host:it.ip, port:it.port, secret:"", country:(it.country||"--").toLowerCase(), ping:it.ping})
+              );
+              setData(arr); setLoading(false);
+            } catch(e){ setError(e.message); setLoading(false);}
+          }
+          fetchAll();
+        }, [mtUrl,socksUrl]);
+        return {data,loading,error};
+      }
+
+      function Toast() {
+        const el = document.getElementById("toast");
+        return (txt,ms=1500)=>{ el.innerText=txt; el.style.display="block"; clearTimeout(window.toastTimer); window.toastTimer=setTimeout(()=>el.style.display="none",ms);}
+      }
+
+      function flagUrl(cc){ if(!cc||cc==="--") return null; return `https://flagcdn.com/w40/${cc}.png`; }
+      function tgLink(item){ return item.protocol==="MTProto" ? `tg://proxy?server=${item.host}&port=${item.port}&secret=${item.secret}` : `tg://socks?server=${item.host}&port=${item.port}`; }
+
+      function App(){
+        const {data,loading,error}=useFetchLists(
+          "https://raw.githubusercontent.com/hookzof/socks5_list/master/tg/mtproto.json",
+          "https://raw.githubusercontent.com/hookzof/socks5_list/master/tg/socks.json"
+        );
+        const [protocol,setProtocol]=useState("all");
+        const [country,setCountry]=useState("all");
+        const [sortBy,setSortBy]=useState("ping");
+        const [page,setPage]=useState(1);
+        const size=9;
+
+        const toast=useRef(null);
+        useEffect(()=>{toast.current=Toast();},[]);
+
+        const countries=useMemo(()=>["all",...new Set(data.map(d=>d.country))],[data]);
+        let list=data.filter(d=>(protocol==="all"||d.protocol===protocol)&&(country==="all"||d.country===country));
+        list.sort((a,b)=>sortBy==="ping"?a.ping-b.ping:a.protocol.localeCompare(b.protocol));
+        const pages=Math.ceil(list.length/size)||1;
+        const slice=list.slice((page-1)*size,page*size);
+
+        return (
+          <div className="max-w-6xl mx-auto p-6">
+            <header className="flex flex-wrap gap-3 justify-between mb-6 items-center">
+              <h1 className="text-xl font-bold">Proxy Explorer</h1>
+              <div className="flex gap-3 items-center">
+                <select value={protocol} onChange={e=>{setProtocol(e.target.value);setPage(1)}} className="bg-gray-800 rounded px-3 py-2">
+                  <option value="all">همه پروتکل‌ها</option>
+                  <option value="MTProto">MTProto</option>
+                  <option value="SOCKS5">SOCKS5</option>
+                </select>
+
+                <div className="dropdown">
+                  <button className="bg-gray-800 px-3 py-2 rounded flex items-center gap-2">{country==="all"?"همه کشورها":COUNTRY_NAMES[country] || country.toUpperCase()} ⬇️</button>
+                  <div className="dropdown-content">
+                    <div className="dropdown-item" onClick={()=>{setCountry("all");setPage(1);}}>همه کشورها</div>
+                    {countries.filter(c=>c!=="all").map(c=>(
+                      <div key={c} className="dropdown-item" onClick={()=>{setCountry(c);setPage(1);}}>
+                        {flagUrl(c)&&<img src={flagUrl(c)} alt="" className="flag"/>}
+                        {COUNTRY_NAMES[c]||c.toUpperCase()}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <select value={sortBy} onChange={e=>setSortBy(e.target.value)} className="bg-gray-800 rounded px-3 py-2">
+                  <option value="ping">پینگ</option>
+                  <option value="protocol">پروتکل</option>
+                </select>
+              </div>
+            </header>
+
+            {loading && <p>در حال بارگذاری...</p>}
+            {error && <p className="text-red-400">{error}</p>}
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {slice.map(p=>(
+                <div key={p.id} className="glass-card p-4 rounded-xl flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between font-semibold">
+                      <span>{p.protocol}</span>
+                      <span>{p.ping} ms</span>
+                    </div>
+                    <div className="mt-2 text-sm">{p.host}:{p.port}</div>
+                    <div className="mt-2 flex items-center gap-2">
+                      {flagUrl(p.country)&&<img src={flagUrl(p.country)} alt="" className="flag"/>}
+                      <span>{COUNTRY_NAMES[p.country]||p.country.toUpperCase()}</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <button onClick={()=>{navigator.clipboard.writeText(tgLink(p));toast.current("لینک کپی شد")}} className="flex-1 bg-green-500 text-black rounded py-1 hover:bg-green-400 transition">کپی لینک</button>
+                    <a href={tgLink(p)} className="flex-1 bg-blue-500 text-black text-center rounded py-1 hover:bg-blue-400 transition">اتصال</a>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-center gap-2 mt-6">
+              <button disabled={page===1} onClick={()=>setPage(p=>p-1)} className="px-3 py-1 bg-gray-700 rounded disabled:opacity-40">قبلی</button>
+              <span>صفحه {page}/{pages}</span>
+              <button disabled={page===pages} onClick={()=>setPage(p=>p+1)} className="px-3 py-1 bg-gray-700 rounded disabled:opacity-40">بعدی</button>
+            </div>
+          </div>
+        )
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+    </script>
+  </body>
+</html>
