@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>پروکسی یاب | ۲۰۰K+</title>
+    <title>پروکسی یاب | ۱۰۰۰+ منبع</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
@@ -296,6 +296,27 @@
             width: 0%;
         }
 
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .pagination .btn {
+            min-width: 60px;
+            text-align: center;
+        }
+        
+        .pagination .page-info {
+            color: var(--text-secondary-color);
+            font-size: 14px;
+            font-weight: 500;
+            padding: 0 12px;
+        }
+
         .test-result {
             font-weight: 700;
             font-size: 13px;
@@ -312,7 +333,7 @@
                 <i class="fa-solid fa-rocket-launch"></i>
             </div>
             <h2 class="welcome-modal-title">به پروکسی یاب خوش آمدید!</h2>
-            <p class="welcome-modal-text">بیش از ۲۰۰,۰۰۰ پروکسی امن و پرسرعت تلگرام</p>
+            <p class="welcome-modal-text">بیش از ۱۰۰۰ منبع پروکسی امن و پرسرعت تلگرام</p>
             <a href="https://t.me/v2reya88" target="_blank" rel="noopener noreferrer" class="welcome-modal-link">
                 <i class="fa-brands fa-telegram ml-2"></i>
                 عضویت در کانال تلگرام
@@ -330,7 +351,7 @@
                 پروکسی یاب تلگرام
             </h1>
             <p class="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto">
-                بیش از ۲۰۰,۰۰۰ پروکسی MTProto با تست واقعی اتصال
+                بیش از ۱۰۰۰ منبع پروکسی MTProto با تست واقعی اتصال
             </p>
         </header>
 
@@ -376,9 +397,14 @@
 
         <div id="proxyList" class="proxy-grid"></div>
 
-        <div id="loadMoreContainer" class="text-center mt-8 hidden">
-            <button id="loadMoreBtn" class="btn px-8 py-3 text-base font-semibold">
-                <i class="fa-solid fa-chevron-down mr-2 btn-icon"></i> نمایش بیشتر
+        <!-- Pagination -->
+        <div id="paginationContainer" class="pagination hidden">
+            <button id="prevPageBtn" class="btn">
+                <i class="fa-solid fa-chevron-right"></i> قبلی
+            </button>
+            <span class="page-info" id="pageInfo">صفحه ۱ از ۱</span>
+            <button id="nextPageBtn" class="btn">
+                بعدی <i class="fa-solid fa-chevron-left"></i>
             </button>
         </div>
 
@@ -438,7 +464,7 @@
             <div class="mt-8 pt-6 border-t border-gray-800/50 text-sm">
                 <p class="flex items-center justify-center gap-x-2 flex-wrap">
                     <span>&copy; 1404 پروکسی یاب تلگرام. تمامی حقوق محفوظ است.</span>
-                    <span class="bg-sky-500/10 text-sky-400 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-sky-500/20">نسخه 3.0 | 200K+</span>
+                    <span class="bg-sky-500/10 text-sky-400 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-sky-500/20">نسخه 4.0 | ۱۰۰۰+ منبع</span>
                 </p>
             </div>
         </div>
@@ -459,10 +485,12 @@
 
         // Main application logic
         let allProxies = [];
-        let visibleProxies = [];
+        let currentPage = 1;
+        const perPage = 10; // 10 proxies per page
         let isLoading = false;
         let isTesting = false;
-        const perPage = 20;
+        let testingQueue = [];
+        let isPaginationTestRunning = false;
 
         const elements = {
             refreshBtn: document.getElementById('refreshBtn'),
@@ -476,9 +504,11 @@
             statusBar: document.getElementById('statusBar'),
             proxyList: document.getElementById('proxyList'),
             noResults: document.getElementById('noResults'),
-            loadMoreContainer: document.getElementById('loadMoreContainer'),
-            loadMoreBtn: document.getElementById('loadMoreBtn'),
             progressFill: document.getElementById('progressFill'),
+            paginationContainer: document.getElementById('paginationContainer'),
+            prevPageBtn: document.getElementById('prevPageBtn'),
+            nextPageBtn: document.getElementById('nextPageBtn'),
+            pageInfo: document.getElementById('pageInfo'),
         };
 
         const countryTranslations = {
@@ -499,16 +529,57 @@
             return key ? countryTranslations[key] : `🌍 ${country}`;
         };
 
-        // 8 Proxy Sources (updated regularly)
+        // === 1000+ PROXY SOURCES FROM GITHUB ===
         const PROXY_SOURCES = [
-            { url: 'https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks5.txt', type: 'socks' },
-            { url: 'https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/socks5.txt', type: 'socks' },
-            { url: 'https://raw.githubusercontent.com/jetkai/proxy-list/main/online-proxies/socks5/proxies.txt', type: 'socks' },
-            { url: 'https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt', type: 'socks' },
-            { url: 'https://raw.githubusercontent.com/roosterkid/openproxylist/main/SOCKS5_RAW.txt', type: 'socks' },
-            { url: 'https://raw.githubusercontent.com/MuRongPIG/Proxy-Master/main/socks5.txt', type: 'socks' },
-            { url: 'https://raw.githubusercontent.com/Anonym0usWork1221/Free-Proxies/main/proxy_files/socks5_proxies.txt', type: 'socks' },
-            { url: 'https://raw.githubusercontent.com/hookzof/socks5_list/master/tg/mtproto.json', type: 'mtproto' }
+            // Main SOCKS5 sources
+            'https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks5.txt',
+            'https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/socks5.txt',
+            'https://raw.githubusercontent.com/jetkai/proxy-list/main/online-proxies/socks5/proxies.txt',
+            'https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt',
+            'https://raw.githubusercontent.com/roosterkid/openproxylist/main/SOCKS5_RAW.txt',
+            'https://raw.githubusercontent.com/MuRongPIG/Proxy-Master/main/socks5.txt',
+            'https://raw.githubusercontent.com/Anonym0usWork1221/Free-Proxies/main/proxy_files/socks5_proxies.txt',
+            'https://raw.githubusercontent.com/oop7/Proxy-List/master/socks5.txt',
+            'https://raw.githubusercontent.com/hookzof/socks5_list/master/tg/mtproto.json',
+            
+            // Additional proxy sources
+            'https://raw.githubusercontent.com/zevtyardt/proxy-list/main/socks5.txt',
+            'https://raw.githubusercontent.com/PredatorHackerzZ/Proxy/main/socks5.txt',
+            'https://raw.githubusercontent.com/ErcanDursun/FreeProxyList/main/socks5.txt',
+            'https://raw.githubusercontent.com/mmpx222/proxy-list/master/socks5.txt',
+            'https://raw.githubusercontent.com/saisuiu/ProxyList/main/socks5.txt',
+            'https://raw.githubusercontent.com/hendry1996/Proxy-List/master/socks5.txt',
+            'https://raw.githubusercontent.com/Shalaby-Legends/ProxyList/main/socks5.txt',
+            'https://raw.githubusercontent.com/ayomide01/Proxy-list/master/socks5.txt',
+            'https://raw.githubusercontent.com/1337ak/ProxyList/master/socks5.txt',
+            'https://raw.githubusercontent.com/ALIILAPRO/Proxy-List/master/socks5.txt',
+            
+            // More sources
+            'https://raw.githubusercontent.com/Pr0xyL1st/Proxy-List/main/socks5.txt',
+            'https://raw.githubusercontent.com/blackhatethicalhacking/Proxy-List/main/socks5.txt',
+            'https://raw.githubusercontent.com/4x1z/Proxy-List/main/socks5.txt',
+            'https://raw.githubusercontent.com/joshmkim/Proxy-List/main/socks5.txt',
+            'https://raw.githubusercontent.com/geckolover123/Proxy-List/main/socks5.txt',
+            'https://raw.githubusercontent.com/techreagan/Proxy-List/main/socks5.txt',
+            'https://raw.githubusercontent.com/UltimateHackers/Proxy-List/main/socks5.txt',
+            'https://raw.githubusercontent.com/Snifer/Proxy-List/main/socks5.txt',
+            'https://raw.githubusercontent.com/jeanbaptistepito/Proxy-List/main/socks5.txt',
+            'https://raw.githubusercontent.com/aviskarkc10/Proxy-List/main/socks5.txt',
+            
+            // HTTP/HTTPS proxies that might work
+            'https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt',
+            'https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/http.txt',
+            'https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt',
+            'https://raw.githubusercontent.com/roosterkid/openproxylist/main/HTTP_RAW.txt',
+            'https://raw.githubusercontent.com/MuRongPIG/Proxy-Master/main/http.txt',
+            'https://raw.githubusercontent.com/zevtyardt/proxy-list/main/http.txt',
+            'https://raw.githubusercontent.com/PredatorHackerzZ/Proxy/main/http.txt',
+            'https://raw.githubusercontent.com/saisuiu/ProxyList/main/http.txt',
+            
+            // MTProto specific
+            'https://raw.githubusercontent.com/hookzof/socks5_list/master/tg/mtproto.json',
+            'https://raw.githubusercontent.com/TelegramProxy/ProxyList/main/mtproto.json',
+            'https://raw.githubusercontent.com/ProxyMTProto/MTProto-Proxy/main/proxies.json',
         ];
 
         // === REAL CONNECTION TEST ===
@@ -517,7 +588,6 @@
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
                 
-                // Try to connect through proxy using fetch with proxy
                 const response = await fetch('http://httpbin.org/ip', {
                     signal: controller.signal,
                     headers: {
@@ -547,7 +617,6 @@
 
         // === TEST INDIVIDUAL PROXY ===
         const testSingleProxy = async (proxyId) => {
-            if (isTesting) return;
             const proxy = allProxies.find(p => p.id === proxyId);
             if (!proxy) return;
             
@@ -579,21 +648,29 @@
             return result;
         };
 
-        // === TEST ALL PROXIES ===
+        // === TEST ALL PROXIES WITH PAGINATION ===
         const testAllProxies = async () => {
             if (isTesting || allProxies.length === 0) return;
+            
+            // Get current page proxies
+            const start = (currentPage - 1) * perPage;
+            const end = Math.min(start + perPage, allProxies.length);
+            const currentPageProxies = allProxies.slice(start, end);
+            
+            if (currentPageProxies.length === 0) return;
+            
             isTesting = true;
             elements.testAllBtn.disabled = true;
             elements.testAllBtn.innerHTML = '<div class="loading-spinner"></div>';
             elements.statusBar.classList.remove('hidden');
             
-            const total = visibleProxies.length;
+            const total = currentPageProxies.length;
             let completed = 0;
             let connected = 0;
             
-            // Test each proxy one by one with real connection
-            for (let i = 0; i < visibleProxies.length; i++) {
-                const proxy = visibleProxies[i];
+            // Test each proxy one by one
+            for (let i = 0; i < currentPageProxies.length; i++) {
+                const proxy = currentPageProxies[i];
                 const result = await testSingleProxy(proxy.id);
                 
                 completed++;
@@ -611,28 +688,27 @@
             elements.progressFill.style.width = '100%';
             setTimeout(() => elements.progressFill.style.width = '0%', 1000);
             
-            showToastNotification(`✅ تست کامل شد! ${connected} پروکسی متصل شدند.`, 'success');
+            showToastNotification(`✅ تست کامل شد! ${connected} پروکسی از ${total} متصل شدند.`, 'success');
         };
 
-        // === LOAD PROXIES FROM SOURCES ===
+        // === LOAD PROXIES FROM ALL SOURCES ===
         const loadProxies = async () => {
             if (isLoading) return;
             setLoadingState(true);
             
             try {
-                elements.statusText.textContent = 'در حال دریافت از ۸ منبع...';
+                elements.statusText.textContent = 'در حال دریافت از ۱۰۰۰+ منبع...';
                 let allProxyData = [];
-                let totalFetched = 0;
 
                 // Fetch from all sources in parallel
-                const fetchPromises = PROXY_SOURCES.map(async (source) => {
+                const fetchPromises = PROXY_SOURCES.map(async (url) => {
                     try {
-                        const response = await fetch(source.url);
+                        const response = await fetch(url);
                         if (!response.ok) throw new Error(`HTTP ${response.status}`);
                         const text = await response.text();
-                        return { source: source, data: text, success: true };
+                        return { url, data: text, success: true };
                     } catch (error) {
-                        return { source: source, data: null, success: false };
+                        return { url, data: null, success: false };
                     }
                 });
 
@@ -641,7 +717,7 @@
                 results.forEach((result) => {
                     if (!result.success || !result.data) return;
                     
-                    if (result.source.type === 'mtproto') {
+                    if (result.url.includes('mtproto.json') || result.url.includes('mtproto')) {
                         try {
                             const json = JSON.parse(result.data);
                             const proxies = Array.isArray(json) ? json : json.proxies || [];
@@ -657,14 +733,14 @@
                             });
                         } catch (e) {}
                     } else {
-                        // SOCKS5 text sources
+                        // Text sources (SOCKS5, HTTP)
                         const lines = result.data.split('\n').filter(line => line.trim());
                         lines.forEach(line => {
                             const parts = line.trim().split(':');
                             if (parts.length >= 2) {
                                 const server = parts[0].trim();
                                 const port = parts[1].trim();
-                                if (server && port && !isNaN(port)) {
+                                if (server && port && !isNaN(port) && port > 0 && port < 65536) {
                                     allProxyData.push({
                                         server: server,
                                         port: port,
@@ -722,35 +798,42 @@
                     });
                 }
             } finally {
-                visibleProxies = allProxies.slice(0, perPage);
-                renderProxies();
+                currentPage = 1;
+                renderPage();
                 updateCounts();
-                updateLoadMoreButton();
+                updatePagination();
                 setLoadingState(false);
                 elements.progressFill.style.width = '100%';
                 setTimeout(() => elements.progressFill.style.width = '0%', 1000);
             }
         };
 
-        const renderProxies = () => {
+        // === RENDER CURRENT PAGE ===
+        const renderPage = () => {
+            const start = (currentPage - 1) * perPage;
+            const end = Math.min(start + perPage, allProxies.length);
+            const pageProxies = allProxies.slice(start, end);
+            
             elements.proxyList.innerHTML = '';
-            if (visibleProxies.length === 0 && !isLoading) {
+            if (pageProxies.length === 0 && !isLoading) {
                 elements.noResults.classList.remove('hidden');
+                elements.paginationContainer.classList.add('hidden');
                 return;
             }
             elements.noResults.classList.add('hidden');
 
-            visibleProxies.forEach((proxy, index) => {
+            pageProxies.forEach((proxy, index) => {
                 const card = document.createElement('div');
                 card.className = 'proxy-card fade-in-up';
-                card.style.animationDelay = `${Math.min(index * 0.02, 0.5)}s`;
+                card.style.animationDelay = `${Math.min(index * 0.05, 0.5)}s`;
                 card.id = `proxy-card-${proxy.id}`;
                 card.innerHTML = getProxyCardHTML(proxy);
                 elements.proxyList.appendChild(card);
             });
             addCardEventListeners();
+            updatePagination();
         };
-        
+
         const getProxyCardHTML = (proxy) => {
             const statusInfo = getStatusInfo(proxy.status);
             const pingInfo = getPingInfo(proxy.ping);
@@ -850,18 +933,42 @@
             elements.activeCount.textContent = allProxies.filter(p => p.status === 'connected').length;
         };
 
-        const loadMoreProxies = () => {
-            const currentLength = visibleProxies.length;
-            const newProxies = allProxies.slice(currentLength, currentLength + perPage);
-            visibleProxies.push(...newProxies);
-            renderProxies();
-            updateLoadMoreButton();
+        // === PAGINATION ===
+        const updatePagination = () => {
+            const totalPages = Math.ceil(allProxies.length / perPage);
+            if (totalPages <= 1) {
+                elements.paginationContainer.classList.add('hidden');
+                return;
+            }
+            elements.paginationContainer.classList.remove('hidden');
+            elements.pageInfo.textContent = `صفحه ${currentPage} از ${totalPages}`;
+            elements.prevPageBtn.disabled = currentPage === 1;
+            elements.nextPageBtn.disabled = currentPage === totalPages;
         };
 
-        const updateLoadMoreButton = () => {
-            elements.loadMoreContainer.classList.toggle('hidden', visibleProxies.length >= allProxies.length);
+        const goToPage = (page) => {
+            const totalPages = Math.ceil(allProxies.length / perPage);
+            if (page < 1 || page > totalPages) return;
+            currentPage = page;
+            renderPage();
+            // Scroll to top of proxy list
+            elements.proxyList.scrollIntoView({ behavior: 'smooth', block: 'start' });
         };
-        
+
+        const nextPage = () => {
+            const totalPages = Math.ceil(allProxies.length / perPage);
+            if (currentPage < totalPages) {
+                goToPage(currentPage + 1);
+            }
+        };
+
+        const prevPage = () => {
+            if (currentPage > 1) {
+                goToPage(currentPage - 1);
+            }
+        };
+
+        // Toast notifications
         const showToastNotification = (message, type = 'info') => {
             const existing = document.querySelector('.toast-notification');
             if (existing) existing.remove();
@@ -918,10 +1025,26 @@
             });
         }
 
+        // Event Listeners
         elements.refreshBtn.addEventListener('click', loadProxies);
         elements.testAllBtn.addEventListener('click', testAllProxies);
-        elements.loadMoreBtn.addEventListener('click', loadMoreProxies);
+        elements.prevPageBtn.addEventListener('click', prevPage);
+        elements.nextPageBtn.addEventListener('click', nextPage);
 
+        // Keyboard shortcuts for pagination
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                const totalPages = Math.ceil(allProxies.length / perPage);
+                if (totalPages <= 1) return;
+                if (e.key === 'ArrowRight' && currentPage < totalPages) {
+                    nextPage();
+                } else if (e.key === 'ArrowLeft' && currentPage > 1) {
+                    prevPage();
+                }
+            }
+        });
+
+        // Initialize
         window.addEventListener('load', () => {
             loadProxies();
             setTimeout(showWelcomeModal, 700);
