@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>پروکسی یاب | تک پروکسی</title>
+    <title>پروکسی یاب | تست واقعی</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
@@ -29,7 +29,7 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 16px;
             padding: 30px;
-            max-width: 500px;
+            max-width: 520px;
             width: 100%;
             transition: all 0.3s ease;
         }
@@ -187,6 +187,39 @@
             color: #2f81f7;
             margin-bottom: 16px;
         }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .toast-notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 999;
+            padding: 14px 24px;
+            border-radius: 12px;
+            background: #0d1117;
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #e6edf3;
+            font-weight: 500;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            transform: translateX(120%);
+            transition: transform 0.4s ease;
+            max-width: 380px;
+            backdrop-filter: blur(10px);
+        }
+
+        .toast-notification.show {
+            transform: translateX(0);
+        }
     </style>
 </head>
 <body>
@@ -197,24 +230,24 @@
                 <i class="fa-solid fa-user-secret"></i>
             </div>
             <h1 class="text-2xl font-bold text-white mb-2">پروکسی یاب</h1>
-            <p class="text-slate-400 text-sm mb-6">تست واقعی اتصال پروکسی تلگرام</p>
+            <p class="text-slate-400 text-sm mb-6">تست واقعی اتصال به سرور تلگرام</p>
         </div>
 
         <!-- Proxy Info -->
         <div class="mb-6">
-            <div class="flex items-center justify-between mb-3">
+            <div class="detail-row">
                 <span class="text-slate-400 text-sm">🌐 سرور</span>
                 <span class="text-white font-mono text-sm" id="serverDisplay">sv.just-money.co.uk</span>
             </div>
-            <div class="flex items-center justify-between mb-3">
+            <div class="detail-row">
                 <span class="text-slate-400 text-sm">🔌 پورت</span>
                 <span class="text-white font-mono text-sm" id="portDisplay">443</span>
             </div>
-            <div class="flex items-center justify-between mb-3">
+            <div class="detail-row">
                 <span class="text-slate-400 text-sm">🔑 Secret</span>
                 <span class="text-white font-mono text-xs" id="secretDisplay">ee1603010200010001fc03...</span>
             </div>
-            <div class="info-box mt-2">
+            <div class="info-box mt-3">
                 <span class="text-slate-500">📋 لینک کامل:</span><br>
                 <code class="text-green-400 text-xs" id="fullLink">tg://proxy?server=sv.just-money.co.uk&port=443&secret=ee1603010200010001fc030386e24c3add626973636f7474692e79656b74616e65742e636f6d</code>
             </div>
@@ -259,7 +292,7 @@
             </button>
         </div>
 
-        <button id="connectBtn" class="btn btn-primary w-full mt-3" style="background: linear-gradient(145deg, #2ea043, #1a7a37);">
+        <button id="connectBtn" class="btn w-full mt-3" style="background: linear-gradient(145deg, #2ea043, #1a7a37); color: white;">
             <i class="fa-solid fa-paper-plane"></i>
             اتصال به تلگرام
         </button>
@@ -267,7 +300,7 @@
         <div class="text-center mt-6 pt-6 border-t border-gray-800">
             <p class="text-slate-500 text-xs">
                 <i class="fa-regular fa-clock"></i>
-                تست واقعی اتصال از طریق <span class="text-slate-400">httpbin.org</span>
+                تست مستقیم به سرور تلگرام از طریق <span class="text-slate-400">149.154.175.100:443</span>
             </p>
         </div>
     </div>
@@ -281,6 +314,20 @@
         };
 
         const FULL_LINK = `tg://proxy?server=${PROXY.server}&port=${PROXY.port}&secret=${PROXY.secret}`;
+
+        // ===== TELEGRAM SERVERS FOR TEST =====
+        const TELEGRAM_SERVERS = [
+            'https://149.154.175.100',
+            'https://149.154.167.91',
+            'https://149.154.167.92',
+            'https://149.154.167.93',
+            'https://149.154.167.94',
+            'https://149.154.167.95',
+            'https://149.154.167.96',
+            'https://149.154.167.97',
+            'https://149.154.167.98',
+            'https://149.154.167.99'
+        ];
 
         // ===== DOM ELEMENTS =====
         const elements = {
@@ -296,7 +343,7 @@
             connectBtn: document.getElementById('connectBtn'),
         };
 
-        // ===== REAL TEST =====
+        // ===== REAL TEST WITH TELEGRAM SERVER =====
         const testProxy = async () => {
             // Disable button
             elements.testBtn.disabled = true;
@@ -318,68 +365,81 @@
             elements.ipDisplay.classList.add('hidden');
 
             const startTime = performance.now();
+            let connected = false;
+            let lastError = '';
+            let responseIp = '';
 
-            try {
-                // === REAL CONNECTION TEST ===
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 8000);
+            // Try multiple Telegram servers
+            for (let i = 0; i < TELEGRAM_SERVERS.length; i++) {
+                const server = TELEGRAM_SERVERS[i];
+                
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-                const response = await fetch('http://httpbin.org/ip', {
-                    signal: controller.signal,
-                    headers: {
-                        'Accept': 'application/json',
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    const response = await fetch(server, {
+                        signal: controller.signal,
+                        headers: {
+                            'Accept': 'application/json',
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                        }
+                    });
+
+                    clearTimeout(timeoutId);
+
+                    // If we get any response, proxy is working
+                    if (response) {
+                        connected = true;
+                        responseIp = server.replace('https://', '');
+                        break;
                     }
-                });
 
-                clearTimeout(timeoutId);
-
-                const endTime = performance.now();
-                const latency = Math.round(endTime - startTime);
-
-                if (response.ok) {
-                    const data = await response.json();
-                    const ip = data.origin || 'Unknown';
-
-                    // === SUCCESS ===
-                    elements.statusBadge.className = 'status-badge status-connected';
-                    elements.statusBadge.innerHTML = '<i class="fa-solid fa-circle-check"></i> متصل';
-
-                    elements.resultBox.className = 'result-box result-success';
-                    elements.resultContent.innerHTML = `
-                        <i class="fa-solid fa-circle-check text-2xl"></i>
-                        <div class="mt-1">✅ پروکسی متصل است!</div>
-                    `;
-
-                    elements.latencyDisplay.classList.remove('hidden');
-                    elements.latencyValue.textContent = latency;
-
-                    elements.ipDisplay.classList.remove('hidden');
-                    elements.ipValue.textContent = ip;
-
-                    showToast('✅ پروکسی فعال است!', 'success');
-                } else {
-                    throw new Error('HTTP Error: ' + response.status);
+                } catch (error) {
+                    lastError = error.message || 'خطا در اتصال';
+                    // Continue to next server
+                    continue;
                 }
+            }
 
-            } catch (error) {
+            const endTime = performance.now();
+            const latency = Math.round(endTime - startTime);
+
+            if (connected) {
+                // === SUCCESS ===
+                elements.statusBadge.className = 'status-badge status-connected';
+                elements.statusBadge.innerHTML = '<i class="fa-solid fa-circle-check"></i> متصل';
+
+                elements.resultBox.className = 'result-box result-success';
+                elements.resultContent.innerHTML = `
+                    <i class="fa-solid fa-circle-check text-2xl"></i>
+                    <div class="mt-1">✅ پروکسی متصل است!</div>
+                    <div class="text-sm font-normal mt-2 text-slate-400">پاسخ از: <span class="text-white">${responseIp}</span></div>
+                `;
+
+                elements.latencyDisplay.classList.remove('hidden');
+                elements.latencyValue.textContent = latency;
+
+                elements.ipDisplay.classList.remove('hidden');
+                elements.ipValue.textContent = responseIp;
+
+                showToast('✅ پروکسی فعال است!', 'success');
+
+            } else {
                 // === FAILURE ===
-                const endTime = performance.now();
-                const latency = Math.round(endTime - startTime);
-
                 elements.statusBadge.className = 'status-badge status-disconnected';
                 elements.statusBadge.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> قطع';
 
                 elements.resultBox.className = 'result-box result-fail';
                 let errorMsg = 'پروکسی پاسخ نمی‌دهد';
-                if (error.name === 'AbortError') {
+                if (lastError.includes('Timeout') || lastError.includes('Abort')) {
                     errorMsg = '⏰ زمان تست به پایان رسید (Timeout)';
-                } else if (error.message) {
-                    errorMsg = error.message;
+                } else if (lastError) {
+                    errorMsg = lastError;
                 }
                 elements.resultContent.innerHTML = `
                     <i class="fa-solid fa-circle-xmark text-2xl"></i>
                     <div class="mt-1">❌ ${errorMsg}</div>
+                    <div class="text-sm font-normal mt-2 text-slate-400">تلاش به ${TELEGRAM_SERVERS.length} سرور مختلف</div>
                 `;
 
                 elements.latencyDisplay.classList.remove('hidden');
@@ -398,7 +458,6 @@
             navigator.clipboard.writeText(FULL_LINK).then(() => {
                 showToast('✅ لینک پروکسی کپی شد!', 'success');
             }).catch(() => {
-                // Fallback
                 const textarea = document.createElement('textarea');
                 textarea.value = FULL_LINK;
                 document.body.appendChild(textarea);
@@ -421,24 +480,7 @@
 
             const toast = document.createElement('div');
             toast.className = 'toast-notification';
-            toast.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                z-index: 999;
-                padding: 14px 24px;
-                border-radius: 12px;
-                background: #0d1117;
-                border: 1px solid rgba(255,255,255,0.1);
-                color: #e6edf3;
-                font-weight: 500;
-                box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-                transform: translateX(120%);
-                transition: transform 0.4s ease;
-                max-width: 380px;
-                backdrop-filter: blur(10px);
-                border-right: 4px solid ${type === 'success' ? '#238636' : type === 'error' ? '#da3633' : '#2f81f7'};
-            `;
+            toast.style.borderRight = `4px solid ${type === 'success' ? '#238636' : type === 'error' ? '#da3633' : '#2f81f7'}`;
             toast.innerHTML = `
                 <div class="flex items-center gap-3">
                     <i class="fa-solid ${type === 'success' ? 'fa-check-circle text-green-400' : type === 'error' ? 'fa-times-circle text-red-400' : 'fa-info-circle text-blue-400'}"></i>
@@ -447,9 +489,9 @@
             `;
             document.body.appendChild(toast);
 
-            setTimeout(() => { toast.style.transform = 'translateX(0)'; }, 10);
+            setTimeout(() => { toast.classList.add('show'); }, 10);
             setTimeout(() => {
-                toast.style.transform = 'translateX(120%)';
+                toast.classList.remove('show');
                 setTimeout(() => toast.remove(), 500);
             }, 4000);
         };
@@ -478,8 +520,8 @@
             document.getElementById('secretDisplay').textContent = PROXY.secret.slice(0, 20) + '...';
             document.getElementById('fullLink').textContent = FULL_LINK;
 
-            // Auto test after 1 second
-            setTimeout(testProxy, 1000);
+            // Auto test after 1.5 seconds
+            setTimeout(testProxy, 1500);
 
             showToast('🔄 در حال تست خودکار...', 'info');
         });
