@@ -381,13 +381,23 @@
             font-weight: 600;
         }
 
-        /* Stop button pulse animation */
         .pulse-stop {
             animation: pulseStop 1s infinite;
         }
         @keyframes pulseStop {
             0%, 100% { box-shadow: 0 0 0 0 rgba(218, 54, 51, 0.4); }
             50% { box-shadow: 0 0 0 10px rgba(218, 54, 51, 0); }
+        }
+
+        .custom-badge {
+            background: linear-gradient(145deg, #2ea04333, #1a7a3733);
+            border: 1px solid var(--success-color);
+            color: var(--success-color);
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 700;
+            margin-right: 6px;
         }
     </style>
 </head>
@@ -475,6 +485,10 @@
                         <div class="text-center">
                             <div class="text-2xl font-bold text-green-400" id="activeCount">0</div>
                             <div class="text-sm text-slate-400">متصل</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-yellow-400" id="customCount">0</div>
+                            <div class="text-sm text-slate-400">اضافه‌شده</div>
                         </div>
                     </div>
                     
@@ -585,7 +599,7 @@
             <div class="mt-8 pt-6 border-t border-gray-800/50 text-sm">
                 <p class="flex items-center justify-center gap-x-2 flex-wrap">
                     <span>&copy; 1404 پروکسی یاب تلگرام. تمامی حقوق محفوظ است.</span>
-                    <span class="bg-sky-500/10 text-sky-400 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-sky-500/20">نسخه 6.0 | توقف تست</span>
+                    <span class="bg-sky-500/10 text-sky-400 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-sky-500/20">نسخه 7.0 | ذخیره‌سازی</span>
                 </p>
             </div>
         </div>
@@ -606,13 +620,13 @@
 
         // Main application logic
         let allProxies = [];
+        let customProxies = [];
         let currentPage = 1;
         const perPage = 10;
         let isLoading = false;
         let isTesting = false;
         let stopTesting = false;
         let nextId = 0;
-        let testInterval = null;
 
         const elements = {
             refreshBtn: document.getElementById('refreshBtn'),
@@ -623,6 +637,7 @@
             refreshIcon: document.getElementById('refreshIcon'),
             proxyCount: document.getElementById('proxyCount'),
             activeCount: document.getElementById('activeCount'),
+            customCount: document.getElementById('customCount'),
             status: document.getElementById('status'),
             statusText: document.getElementById('statusText'),
             statusText2: document.getElementById('statusText2'),
@@ -638,6 +653,41 @@
             closeAddProxyModal: document.getElementById('closeAddProxyModal'),
             proxyInput: document.getElementById('proxyInput'),
             addProxyConfirmBtn: document.getElementById('addProxyConfirmBtn'),
+        };
+
+        // === LOCAL STORAGE ===
+        const STORAGE_KEY = 'customProxies';
+
+        const loadCustomProxies = () => {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    customProxies = JSON.parse(saved);
+                    // Reassign IDs
+                    customProxies.forEach((p, i) => {
+                        p.id = nextId++;
+                        p.isCustom = true;
+                    });
+                }
+            } catch (e) {
+                customProxies = [];
+            }
+        };
+
+        const saveCustomProxies = () => {
+            try {
+                // Save without DOM-specific data
+                const toSave = customProxies.map(p => ({
+                    server: p.server,
+                    port: p.port,
+                    secret: p.secret,
+                    country: p.country,
+                    isCustom: true
+                }));
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+            } catch (e) {
+                console.error('Error saving custom proxies:', e);
+            }
         };
 
         const countryTranslations = {
@@ -756,16 +806,30 @@
             proxy.ping = result.latency || null;
             proxy.ip = result.ip || null;
             
+            // Save custom proxy status to localStorage
+            if (proxy.isCustom) {
+                const customProxy = customProxies.find(p => p.id === proxy.id);
+                if (customProxy) {
+                    customProxy.status = proxy.status;
+                    customProxy.ping = proxy.ping;
+                    customProxy.ip = proxy.ip;
+                    saveCustomProxies();
+                }
+            }
+            
             updateCard(proxyId);
             updateCounts();
             
             return result;
         };
 
-        // === SORT PROXIES (Connected first) ===
+        // === SORT PROXIES (Connected first, then custom) ===
         const sortProxiesByStatus = () => {
             allProxies.sort((a, b) => {
-                // Connected first
+                // Custom proxies first
+                if (a.isCustom && !b.isCustom) return -1;
+                if (b.isCustom && !a.isCustom) return 1;
+                // Then connected
                 if (a.status === 'connected' && b.status !== 'connected') return -1;
                 if (b.status === 'connected' && a.status !== 'connected') return 1;
                 // Then testing
@@ -774,7 +838,6 @@
                 // Then unknown
                 if (a.status === 'unknown' && b.status !== 'unknown') return -1;
                 if (b.status === 'unknown' && a.status !== 'unknown') return 1;
-                // Then disconnected
                 return 0;
             });
         };
@@ -786,7 +849,6 @@
             stopTesting = false;
             isTesting = true;
             
-            // Show stop button, hide test buttons
             elements.stopTestBtn.classList.remove('hidden');
             elements.testAllBtn.style.display = 'none';
             if (full) {
@@ -802,7 +864,6 @@
             let connected = 0;
             
             for (let i = 0; i < proxiesToTest.length; i++) {
-                // Check if stop requested
                 if (stopTesting) {
                     elements.statusText.textContent = `⛔ تست متوقف شد! ${connected} پروکسی متصل شدند.`;
                     showToastNotification(`⛔ تست متوقف شد! ${connected} پروکسی متصل شدند.`, 'warning');
@@ -820,10 +881,7 @@
                 elements.statusText.textContent = `تست ${completed} از ${total} | ${connected} متصل`;
             }
             
-            // Sort proxies (connected first)
             sortProxiesByStatus();
-            
-            // Re-render current page
             renderPage();
             
             isTesting = false;
@@ -859,8 +917,6 @@
             let port = null;
             let secret = null;
             
-            // Format 1: tg://proxy?server=IP&port=PORT&secret=SECRET
-            // Format 2: https://t.me/proxy?server=IP&port=PORT&secret=SECRET
             if (input.includes('proxy?')) {
                 try {
                     const url = new URL(input);
@@ -870,7 +926,6 @@
                 } catch (e) {}
             }
             
-            // Format 3: IP:PORT:SECRET
             if (!server) {
                 const parts = input.split(':');
                 if (parts.length >= 2) {
@@ -882,7 +937,6 @@
                 }
             }
             
-            // Validate
             if (server && port && !isNaN(port) && port > 0 && port < 65536) {
                 if (!secret) {
                     secret = 'ee' + Math.random().toString(36).substring(2, 32);
@@ -912,12 +966,18 @@
                 server: parsed.server,
                 port: parsed.port,
                 secret: parsed.secret,
-                country: '🌍 افزوده شده',
+                country: '🌟 افزوده شده',
                 ping: null,
                 status: 'unknown',
-                ip: null
+                ip: null,
+                isCustom: true
             };
             
+            // Add to custom list
+            customProxies.unshift(newProxy);
+            saveCustomProxies();
+            
+            // Add to all proxies
             allProxies.unshift(newProxy);
             
             currentPage = 1;
@@ -935,6 +995,9 @@
         const loadProxies = async () => {
             if (isLoading) return;
             setLoadingState(true);
+            
+            // Load custom proxies first
+            loadCustomProxies();
             
             try {
                 elements.statusText.textContent = 'در حال دریافت از منابع...';
@@ -1000,8 +1063,8 @@
                     return true;
                 });
 
-                nextId = 0;
-                allProxies = allProxyData.map((p, i) => ({
+                // Convert to proxy objects
+                const newProxies = allProxyData.map((p, i) => ({
                     id: nextId++,
                     server: p.server,
                     port: p.port,
@@ -1009,31 +1072,40 @@
                     country: p.country || '🌍 نامشخص',
                     ping: null,
                     status: 'unknown',
-                    ip: null
+                    ip: null,
+                    isCustom: false
                 }));
 
-                elements.statusText.textContent = `${allProxies.length} پروکسی دریافت شد!`;
+                // Combine: custom proxies first, then new proxies
+                allProxies = [...customProxies, ...newProxies];
+
+                elements.statusText.textContent = `${allProxies.length} پروکسی دریافت شد! (${customProxies.length} اضافه‌شده)`;
 
                 if (allProxies.length === 0) {
                     throw new Error('هیچ پروکسی دریافت نشد');
                 }
 
-                showToastNotification(`✅ ${allProxies.length} پروکسی با موفقیت بارگذاری شدند!`, 'success');
+                showToastNotification(`✅ ${allProxies.length} پروکسی بارگذاری شد! (${customProxies.length} اضافه‌شده)`, 'success');
             } catch (error) {
                 showToastNotification('⚠️ خطا در دریافت: از لیست پیش‌فرض استفاده می‌شود.', 'warning');
-                allProxies = [];
-                for (let i = 0; i < 50; i++) {
-                    allProxies.push({
-                        id: nextId++,
-                        server: `proxy${i}.example.com`,
-                        port: `${4000 + i}`,
-                        secret: 'ee' + Math.random().toString(36).substring(2, 32),
-                        country: ['🇩🇪 آلمان', '🇷🇺 روسیه', '🇬🇧 انگلستان', '🇺🇸 آمریکا'][i % 4],
-                        ping: null,
-                        status: 'unknown',
-                        ip: null
-                    });
+                // Fallback: just use custom proxies
+                if (customProxies.length === 0) {
+                    for (let i = 0; i < 20; i++) {
+                        customProxies.push({
+                            id: nextId++,
+                            server: `proxy${i}.example.com`,
+                            port: `${4000 + i}`,
+                            secret: 'ee' + Math.random().toString(36).substring(2, 32),
+                            country: ['🇩🇪 آلمان', '🇷🇺 روسیه', '🇬🇧 انگلستان', '🇺🇸 آمریکا'][i % 4],
+                            ping: null,
+                            status: 'unknown',
+                            ip: null,
+                            isCustom: true
+                        });
+                    }
+                    saveCustomProxies();
                 }
+                allProxies = [...customProxies];
             } finally {
                 currentPage = 1;
                 renderPage();
@@ -1077,13 +1149,15 @@
             const statusText = proxy.status === 'connected' ? '🟢 متصل' : 
                               proxy.status === 'disconnected' ? '🔴 قطع' :
                               proxy.status === 'testing' ? '⏳ در حال تست' : '⚪ تست نشده';
+            
+            const customBadge = proxy.isCustom ? '<span class="custom-badge">🌟 اضافه‌شده</span>' : '';
 
             return `
                 <div class="card-content space-y-4">
                     <div class="flex items-start justify-between">
                         <div class="flex items-center gap-3">
                             <div class="w-3 h-3 rounded-full ${statusInfo.dotClass} ${statusInfo.pulseClass}" title="${statusText}"></div>
-                            <h3 class="font-bold text-lg text-white">${proxy.server}</h3>
+                            <h3 class="font-bold text-lg text-white">${proxy.server} ${customBadge}</h3>
                         </div>
                         <span id="status-${proxy.id}" class="status-badge ${statusInfo.className}">
                             <i class="${statusInfo.icon}"></i> ${statusText}
@@ -1110,7 +1184,6 @@
 
         const testPing = async (proxyId) => {
             await testSingleProxy(proxyId);
-            // Re-sort after test
             sortProxiesByStatus();
             renderPage();
         };
@@ -1171,6 +1244,7 @@
         const updateCounts = () => {
             elements.proxyCount.textContent = allProxies.length;
             elements.activeCount.textContent = allProxies.filter(p => p.status === 'connected').length;
+            elements.customCount.textContent = customProxies.length;
         };
 
         // === PAGINATION ===
@@ -1285,17 +1359,14 @@
         elements.prevPageBtn.addEventListener('click', prevPage);
         elements.nextPageBtn.addEventListener('click', nextPage);
 
-        // Enter key for add proxy
         elements.proxyInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') addProxy();
         });
 
-        // Close modal on overlay click
         elements.addProxyModal.addEventListener('click', (e) => {
             if (e.target === elements.addProxyModal) hideAddProxyModal();
         });
 
-        // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.key === 'ArrowRight') nextPage();
             else if (e.key === 'ArrowLeft') prevPage();
@@ -1308,6 +1379,7 @@
 
         // === INIT ===
         window.addEventListener('load', () => {
+            loadCustomProxies();
             loadProxies();
             setTimeout(showWelcomeModal, 700);
         });
